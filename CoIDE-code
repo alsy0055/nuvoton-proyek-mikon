@@ -1,0 +1,358 @@
+#include "DrvGPIO.h"
+#include "DrvSYS.h"
+#include "Seven_Segment.h"
+#include "ScanKey.h"
+#include "LCD_Driver.h"
+#include "DrvADC.h"
+#include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
+#define banyakuser 6
+#define portkey2 E_GPA
+#define bitkey2 1
+#define portlampu1 E_GPB
+#define bitlampu1 0
+#define banyakpin 4
+
+struct list
+{
+	char pass[7];
+	char user[10];
+};
+
+struct list data[banyakuser]= { [0].pass = "MEGAS", [0].user = "ISAAC",
+					[1].pass = "B1TCH", [1].user = "KRISNA",
+					[2].pass = "NH4Z12", [2].user = "HANS",
+					[3].pass = "CANMUL", [3].user = "CANMUL",
+					[4].pass = "SEKAYU", [4].user = "AKBAR",
+					[5].pass = "TOL", [5].user = "DIKA"};
+
+char keypad[10][5]={{' '},{"01"},{"ABC2"},{"DEF3"},
+		{"GHI4"},{"JKL5"},{"MNO6"},
+		{"PQRS7"},{"TUV8"},{"WXYZ9"}};
+
+void Init();
+char input[6];
+int pin[banyakpin]={1,2,3,4};
+int inputp[4];
+int dign,key,offset,tunggu,temp,newkey,i,key2,loop,digp;
+int ntry=1;
+int kunci=1;
+int key2mode=0;
+
+void enddisplay()
+{
+	//open your shit, servo
+	kunci=0;
+	clr_all_pannal();
+	print_lcd(1,"Selamat Datang!");
+	print_lcd(2,data[i].user);
+	DrvGPIO_SetBit(portlampu1,bitlampu1);
+	delaycontrol(6);
+	input[0]=' ';
+}
+
+int keypad2in()
+{
+	DrvGPIO_SetBit(portkey2,bitkey2);
+	DrvGPIO_ClrBit(portkey2,bitkey2+2);
+	DrvGPIO_ClrBit(portkey2,bitkey2+4);
+	DrvGPIO_ClrBit(portkey2,bitkey2+6);
+	if(DrvGPIO_GetBit(portkey2,bitkey2+8)==0||DrvGPIO_GetBit(portkey2,bitkey2+10)==0||DrvGPIO_GetBit(portkey2,bitkey2+12)==0||DrvGPIO_GetBit(portkey2,bitkey2+14)==0)
+	{
+		DrvGPIO_SetBit(portkey2,bitkey2+4);
+		if(DrvGPIO_GetBit(portkey2,bitkey2+10)==0||DrvGPIO_GetBit(portkey2,bitkey2+12)==0||DrvGPIO_GetBit(portkey2,bitkey2+14)==0)
+		{
+			DrvGPIO_SetBit(portkey2,bitkey2+2);
+			if(DrvGPIO_GetBit(portkey2,bitkey2+10)==0||DrvGPIO_GetBit(portkey2,bitkey2+12)==0||DrvGPIO_GetBit(portkey2,bitkey2+14)==0)
+			{
+				if(DrvGPIO_GetBit(portkey2,bitkey2+10)==0)
+				{
+					return 7;
+				}
+				else if(DrvGPIO_GetBit(portkey2,bitkey2+12)==0)
+				{
+					return 4;
+				}
+				else
+				{
+					return 1;
+				}
+			}
+			else
+			{
+				DrvGPIO_ClrBit(portkey2,bitkey2+2);
+				if(DrvGPIO_GetBit(portkey2,bitkey2+10)==0)
+				{
+					return 9;
+				}
+				else if(DrvGPIO_GetBit(portkey2,bitkey2+12)==0)
+				{
+					return 6;
+				}
+				else
+				{
+					return 3;
+				}
+			}
+		}
+		else
+		{
+			DrvGPIO_ClrBit(portkey2,bitkey2+4);
+			if(DrvGPIO_GetBit(portkey2,bitkey2+10)==0)
+			{
+				return 8;
+			}
+			else if(DrvGPIO_GetBit(portkey2,bitkey2+12)==0)
+			{
+				return 5;
+			}
+			else if(DrvGPIO_GetBit(portkey2,bitkey2+14)==0)
+			{
+				return 2;
+			}
+			else
+			{
+				return 10;
+			}
+		}
+	}
+	else
+	{
+		return 0;
+	}
+}
+
+
+void delaycontrol(k)
+{
+	while(k>0)
+	{
+		DrvSYS_Delay(500000);
+		k--;
+	}
+}
+
+void delayfrac(n)
+{
+	while (n!=0)
+	{
+		n--;
+		DrvSYS_Delay(5000);
+		temp=Scankey();
+		if(temp!=0||DrvGPIO_GetBit(E_GPB,15)==0) break;
+		if(loop==1)
+		{
+			key2=keypad2in();
+			if(key2!=0) break;
+		}
+	}
+}
+
+
+
+int main()
+{
+	DrvGPIO_ClrBit(portlampu1,bitlampu1);
+	start:
+	Initial_pannel();
+	clr_all_pannal();
+
+	DrvGPIO_ClrBit(E_GPD,14); //nyalain backlight
+	dign=0;
+	digp=0;
+	offset=0;
+	tunggu=0;
+
+	while(kunci==0)
+	{
+		print_lcd(1,"Pintu Terbuka");
+		if(DrvGPIO_GetBit(E_GPB,15)==0||keypad2in()==10)
+			{
+			clr_all_pannal();
+			print_lcd(1,"Pintu Terkunci");
+			DrvGPIO_ClrBit(portlampu1,bitlampu1);
+			delaycontrol(6);
+			clr_all_pannal();
+			kunci=1;
+			ntry=1;
+			goto start;
+			}
+	}
+
+	key=Scankey();
+	key2=keypad2in();
+	loop=1;
+	while(key==0&&kunci==1&&key2==0)
+		{
+			Show_Word(0,dign,'_');
+			delayfrac(28);
+			Show_Word(0,dign,' ');
+			delayfrac(28);
+			if(DrvGPIO_GetBit(E_GPB,15)==0) goto cekpass;
+			key=Scankey();
+			key2=keypad2in();
+		}
+	if (key2!=0)
+	{
+		if (key2==10)
+		{
+			goto pincek;
+		}
+		else
+		{
+			goto keypad2;
+		}
+	}
+	loop=0;
+	in:
+	tunggu=0;
+	Show_Word(0,dign,keypad[key][offset]);
+	if(dign==6) goto cekpass;
+	Show_Word(0,dign+1,'_');
+	DrvGPIO_ClrBit(E_GPB,11);
+	DrvSYS_Delay(70000);
+	input[dign]=keypad[key][offset];
+	newkey=Scankey();
+	if(newkey==key) DrvSYS_Delay(70000);
+	DrvSYS_Delay(70000);
+	DrvGPIO_SetBit(E_GPB,11);
+	newkey=Scankey();
+	while(newkey==0)
+		{
+			Show_Word(0,dign,' ');
+			delayfrac(28);
+			Show_Word(0,dign,keypad[key][offset]);
+			delayfrac(28);
+			if(DrvGPIO_GetBit(E_GPB,15)==0) goto cekpass;
+			tunggu++;
+			if(tunggu==4)
+				{
+				if(dign==5) goto cekpass;
+				goto simpan;
+				}
+			newkey=Scankey();
+		}
+	if(newkey==key)
+	{
+		if((keypad[key][offset]-'0')==key)
+			{
+			offset=0;
+			goto in;
+			}
+		else
+			{
+			offset++;
+			goto in;
+			}
+	}
+	simpan:
+	Show_Word(0,dign,'*');
+	dign++;
+	offset=0;
+	tunggu=0;
+	key=newkey;
+	while(key==0)
+		{
+			Show_Word(0,dign,'_');
+			delayfrac(28);
+			Show_Word(0,dign,' ');
+			delayfrac(28);
+			if(DrvGPIO_GetBit(E_GPB,15)==0) goto cekpass;
+			tunggu++;
+			if(tunggu==100)
+				{
+				tunggu=0;
+				ntry=1;
+				goto start;
+				}
+			key=Scankey();
+		}
+	goto in;
+
+	cekpass:
+	i=0;
+	while(i<banyakuser)
+	{
+		int y=strlen(data[i].pass);
+		if(strncmp(data[i].pass,input,y)==0)
+			{
+				enddisplay();
+				goto start;
+			}
+		i++;
+	}
+	clr_all_pannal();
+	print_lcd(1,"Passcode Salah!");
+	delaycontrol(6);
+	clr_all_pannal();
+	ntry++;
+	if (ntry==4) //kalo gagal 3 kali
+		{
+			int k=1;
+			while(k<20)
+			{
+				DrvSYS_Delay(500000);
+				k++;
+			}
+			ntry=1;
+		}
+	input[0]=' ';
+	goto start;
+
+	keypad2:
+	tunggu=0;
+	inputp[digp]=key2;
+	digp++;
+	if (digp==banyakpin) goto pincek;
+	DrvSYS_Delay(140000);
+	newkey=keypad2in();
+	if(newkey==key2) DrvSYS_Delay(140000);
+	key2=keypad2in();
+	while(key2==0)
+	{
+		DrvSYS_Delay(5000);
+		tunggu++;
+		if(tunggu==500)
+			{
+			tunggu=0;
+			goto pincek;
+			}
+		key2=keypad2in();
+	}
+	tunggu=0;
+	if (key2==10)
+	{
+		goto pincek;
+	}
+	else
+	{
+		goto keypad2;
+	}
+
+	pincek:
+	;
+	int o=0;
+	int t=1;
+	while (o<banyakpin)
+	{
+		if (inputp[o]!=pin[o])
+		{
+			t=0;
+			ntry=1;
+			break;
+		}
+		o++;
+	}
+	if (t==1)
+	{
+		//servo buka
+		kunci=0;
+
+	}
+	digp=0;
+	inputp[digp]=-1;
+	goto start;
+}
+
+
